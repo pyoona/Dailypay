@@ -83,7 +83,7 @@ h2{color:var(--ink);font-size:14px;margin:0 0 2px;font-weight:600}
   <section>
     <div class="row">
       <div class="f dt"><label for="d" id="dlab">วันที่</label><div class="cal" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div><input id="d" type="date" aria-label="เลือกวันที่"></div>
-      <div class="f it"><label for="it">รายการ</label><input id="it" placeholder="เช่น กาแฟ" autocomplete="off"><div class="sg" id="sg" hidden></div></div>
+      <div class="f it"><label for="it">รายการ</label><input id="it" placeholder="เลือกหรือพิมพ์" autocomplete="off"><div class="sg" id="sg" hidden></div></div>
       <div class="f"><label for="p">ราคา</label><input id="p" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></div>
     </div>
     <div class="act"><button class="add" id="add">บันทึก</button><p class="err" id="err" role="alert"></p></div>
@@ -108,7 +108,7 @@ h2{color:var(--ink);font-size:14px;margin:0 0 2px;font-weight:600}
 </main>
 
 <script>
-const API="https://script.google.com/macros/s/AKfycbwSblopqxmLKTv8-oRYeaboGRKKkJ9ajFrKeqwH_M6gCqOaiChdfqjn6WR4l8S2STosIQ/exec";
+const API="https://script.google.com/macros/s/AKfycbzlliiUCuC6JBJjHTeeVdKUwgO3EKqC8139f6NPqKobQdh6mdyVv-gQdr4c7MK3OB_zCA/exec";
 // เรียก Apps Script web app (text/plain เพื่อเลี่ยง CORS preflight)
 function call(action,args){
   // อยู่ในหน้า Apps Script -> ใช้ google.script.run ; อยู่บน GitHub -> ใช้ fetch
@@ -130,7 +130,7 @@ const todayStr=()=>fmt(new Date());
 let rows=[],mode="month",anchor=todayStr();
 
 
-function items(){const s=new Set(ITEMS);rows.forEach(r=>s.add(r.item));return[...s]}
+function items(){return[...new Set(ITEMS)]}
 function showSg(){
   const l=items();
   $("sg").innerHTML=l.map(i=>`<button type="button" data-v="${esc(i)}">${esc(i)}</button>`).join("");
@@ -138,6 +138,7 @@ function showSg(){
 }
 function drawItems(){if(document.activeElement===$("it"))showSg()}
 $("it").addEventListener("focus",showSg);
+$("it").addEventListener("click",showSg);
 $("it").addEventListener("blur",()=>{$("sg").hidden=true});
 $("sg").addEventListener("mousedown",e=>e.preventDefault());
 $("sg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;$("it").value=b.dataset.v;$("sg").hidden=true;$("p").focus()});
