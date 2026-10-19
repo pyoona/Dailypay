@@ -244,15 +244,17 @@ function render(){
   // totals per day (per month in year view); tap a day to see its items
   const grp={};
   inR.forEach(r=>{const k=r.date;grp[k]=(grp[k]||0)+r.price});
-  const ks=Object.keys(grp).sort().reverse();
+  const td=todayStr(),todays=rows.filter(r=>r.date===td);
+  grp[td]=todays.reduce((n,r)=>n+r.price,0);
+  const ks=todays.length?[td]:[];
   $("listT").textContent="รายการ";
   $("list").innerHTML=ks.length?ks.map(k=>{
     const d=parse(k);
     const t=L(d,{weekday:"short",day:"numeric",month:"short",year:"numeric"});
     let h;
-    h=`<div class="dh"><span>${t}</span><span class="ds"><small>ยอดรายวัน</small><b>${money(grp[k])}</b></span></div><div class="lt">รายการ</div>`+inR.filter(r=>r.date===k).map(r=>`<div class="en"><span class="n">${esc(r.item)}</span><span class="v">${money(r.price)}</span><button class="del${armed===r.row?" sure":""}" data-row="${r.row}" aria-label="ลบ ${esc(r.item)}">${armed===r.row?"ยืนยันลบ":"ลบ"}</button></div>`).join("");
+    h=`<div class="dh"><span>${t}</span><span class="ds"><small>ยอดรายวัน</small><b>${money(grp[k])}</b></span></div><div class="lt">รายการ</div>`+todays.map(r=>`<div class="en"><span class="n">${esc(r.item)}</span><span class="v">${money(r.price)}</span><button class="del${armed===r.row?" sure":""}" data-row="${r.row}" aria-label="ลบ ${esc(r.item)}">${armed===r.row?"ยืนยันลบ":"ลบ"}</button></div>`).join("");
     return `<div class="g">${h}</div>`;
-  }).join(""):'<p class="empty">ยังไม่มีรายจ่ายในช่วงนี้ กรอกด้านบนเพื่อเริ่มบันทึก</p>';
+  }).join(""):'<p class="empty">วันนี้ยังไม่มีรายจ่าย กรอกด้านบนเพื่อเริ่มบันทึก</p>';
 }
 
 let armed=null,armT=0;
