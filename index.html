@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>บันทึกรายจ่าย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#eef1f4;--card:#fff;--ink:#000;--mut:#000;--line:#dde2e8;--acc:#0f766e;--accbg:#d6f1ed;--onacc:#fff;--bar:#b9c4d0;--danger:#b42318;--acc2:#2563eb;--warm:#f59e0b;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -51,7 +55,7 @@ h2{color:var(--ink);font-size:14px;margin:0 0 2px;font-weight:600}
 .chart{display:flex;align-items:flex-end;gap:3px;height:62px}
 .xl{margin-bottom:6px}
 .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
-.col em{font-style:normal;font-size:10px;letter-spacing:-.3px;font-weight:600;line-height:14px;height:14px;white-space:nowrap;color:var(--ink)}
+.col em{font-style:normal;font-size:11px;font-weight:600;line-height:14px;height:14px;white-space:nowrap;color:var(--ink)}
 .col i{flex-shrink:0;display:block;width:100%;background:var(--acc2);opacity:.4;border-radius:4px 4px 0 0;min-height:2px}
 .col.max i{background:var(--warm);opacity:1}
 .xl{display:flex;gap:3px;font-size:12px;color:var(--mut);margin-top:1px}
@@ -108,7 +112,7 @@ h2{color:var(--ink);font-size:14px;margin:0 0 2px;font-weight:600}
 </main>
 
 <script>
-const API="https://script.google.com/macros/s/AKfycbzlliiUCuC6JBJjHTeeVdKUwgO3EKqC8139f6NPqKobQdh6mdyVv-gQdr4c7MK3OB_zCA/exec";
+const API="https://script.google.com/macros/s/AKfycbwSblopqxmLKTv8-oRYeaboGRKKkJ9ajFrKeqwH_M6gCqOaiChdfqjn6WR4l8S2STosIQ/exec";
 // เรียก Apps Script web app (text/plain เพื่อเลี่ยง CORS preflight)
 function call(action,args){
   // อยู่ในหน้า Apps Script -> ใช้ google.script.run ; อยู่บน GitHub -> ใช้ fetch
@@ -118,6 +122,30 @@ function call(action,args){
   return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,args:args||[]})})
     .then(r=>r.json())
     .then(j=>{if(j.error)throw new Error(j.error);return j.data});
+}
+// โหลดข้อมูลเริ่มต้น: บน GitHub ใช้ GET (เบากว่า POST และอ่านจากแคชฝั่งสคริปต์ได้ตรง ๆ)
+function loadInit(){
+  if(window.google&&google.script&&google.script.run)return call("getInitData");
+  return fetch(API+"?action=getInitData&t="+Date.now())
+    .then(r=>r.json())
+    .then(j=>{if(j.error)throw new Error(j.error);return j.data});
+}
+
+// ===== แคชในเครื่อง: เปิดหน้าแล้วเห็นข้อมูลชุดล่าสุดทันที แล้วอัปเดตเบื้องหลัง =====
+const LS_KEY="dailypay_init_v1";
+let lastSaved="",writeGen=0;
+function saveLocal(){
+  const s=JSON.stringify({rows,items:ITEMS});
+  lastSaved=s;
+  try{localStorage.setItem(LS_KEY,s)}catch(_){}
+}
+function readLocal(){
+  try{
+    const s=localStorage.getItem(LS_KEY);if(!s)return null;
+    const o=JSON.parse(s);
+    if(o&&Array.isArray(o.rows)){lastSaved=s;return o}
+  }catch(_){}
+  return null;
 }
 let ITEMS=[];
 const $=id=>document.getElementById(id);
@@ -154,6 +182,7 @@ $("add").onclick=()=>{
   call("addExpense",[date,item,price])
     .then(res=>{
       rows.push({row:res.row,date,item,price});anchor=date;done();
+      writeGen++;saveLocal();
       $("it").value="";$("p").value="";drawItems();render();$("it").focus();
     })
     .catch(e=>{done();$("err").textContent="บันทึกไม่สำเร็จ: "+e.message});
@@ -231,7 +260,7 @@ function render(){
       let c="",x="";
       for(let k=st;k<st+per;k++){
         if(k<vals.length){const v=vals[k];
-          c+=`<div class="col${v===m&&v>0?" max":""}" title="${money(v)} บาท">${v>0?`<em>${v>=1000?money(Math.round(v/100)/10)+"k":money(v)}</em>`:""}<i style="height:calc((100% - 14px)*${v/m})"></i></div>`;
+          c+=`<div class="col${v===m&&v>0?" max":""}" title="${money(v)} บาท">${v===m&&v>0?`<em>${money(v)}</em>`:""}<i style="height:calc((100% - 14px)*${v/m})"></i></div>`;
           x+=`<span>${labs[k]}</span>`;
         }else{c+='<div class="col"></div>';x+="<span></span>"}
       }
@@ -244,17 +273,15 @@ function render(){
   // totals per day (per month in year view); tap a day to see its items
   const grp={};
   inR.forEach(r=>{const k=r.date;grp[k]=(grp[k]||0)+r.price});
-  const td=todayStr(),todays=rows.filter(r=>r.date===td);
-  grp[td]=todays.reduce((n,r)=>n+r.price,0);
-  const ks=todays.length?[td]:[];
+  const ks=Object.keys(grp).sort().reverse();
   $("listT").textContent="รายการ";
   $("list").innerHTML=ks.length?ks.map(k=>{
     const d=parse(k);
     const t=L(d,{weekday:"short",day:"numeric",month:"short",year:"numeric"});
     let h;
-    h=`<div class="dh"><span>${t}</span><span class="ds"><small>ยอดรายวัน</small><b>${money(grp[k])}</b></span></div><div class="lt">รายการ</div>`+todays.map(r=>`<div class="en"><span class="n">${esc(r.item)}</span><span class="v">${money(r.price)}</span><button class="del${armed===r.row?" sure":""}" data-row="${r.row}" aria-label="ลบ ${esc(r.item)}">${armed===r.row?"ยืนยันลบ":"ลบ"}</button></div>`).join("");
+    h=`<div class="dh"><span>${t}</span><span class="ds"><small>ยอดรายวัน</small><b>${money(grp[k])}</b></span></div><div class="lt">รายการ</div>`+inR.filter(r=>r.date===k).map(r=>`<div class="en"><span class="n">${esc(r.item)}</span><span class="v">${money(r.price)}</span><button class="del${armed===r.row?" sure":""}" data-row="${r.row}" aria-label="ลบ ${esc(r.item)}">${armed===r.row?"ยืนยันลบ":"ลบ"}</button></div>`).join("");
     return `<div class="g">${h}</div>`;
-  }).join(""):'<p class="empty">วันนี้ยังไม่มีรายจ่าย กรอกด้านบนเพื่อเริ่มบันทึก</p>';
+  }).join(""):'<p class="empty">ยังไม่มีรายจ่ายในช่วงนี้ กรอกด้านบนเพื่อเริ่มบันทึก</p>';
 }
 
 let armed=null,armT=0;
@@ -268,8 +295,8 @@ $("list").onclick=e=>{
     armed=null;clearTimeout(armT);
     del.disabled=true;del.textContent="กำลังลบ…";
     call("deleteExpense",[row,r.date,r.item,r.price])
-      .then(()=>{rows=rows.filter(x=>x!==r);rows.forEach(x=>{if(x.row>row)x.row--});render()})
-      .catch(er=>{$("err2").textContent="ลบไม่สำเร็จ: "+er.message;render()});
+      .then(()=>{rows=rows.filter(x=>x!==r);rows.forEach(x=>{if(x.row>row)x.row--});writeGen++;saveLocal();render()})
+      .catch(er=>{$("err2").textContent="ลบไม่สำเร็จ: "+er.message;render();refresh()});
     return;
   }
   const dr=e.target.closest(".dr");
@@ -281,11 +308,28 @@ const showDate=()=>{const v=$("d").value;$("dlab").textContent=v?L(parse(v),{day
 $("d").addEventListener("change",showDate);
 $("d").addEventListener("click",()=>{try{$("d").showPicker()}catch(_){}});
 $("d").value=todayStr();showDate();
+
+// 1) แสดงข้อมูลที่เคยโหลดไว้ทันที
+const local=readLocal();
+if(local){rows=local.rows;ITEMS=local.items||[];drawItems()}
 render();
-$("err").textContent="กำลังโหลดข้อมูล…";
-call("getInitData")
-  .then(r=>{rows=r.rows;ITEMS=r.items;$("err").textContent="";drawItems();render()})
-  .catch(e=>{$("err").textContent="โหลดข้อมูลไม่สำเร็จ: "+e.message});
+if(!local)$("err").textContent="กำลังโหลดข้อมูล…";
+
+// 2) โหลดข้อมูลล่าสุดจากชีตเบื้องหลัง
+function refresh(){
+  const gen=writeGen;
+  return loadInit()
+    .then(r=>{
+      // ระหว่างรอ มีการเพิ่ม/ลบไปแล้ว -> ผลนี้อาจเก่า ให้โหลดใหม่อีกรอบ
+      if(gen!==writeGen)return refresh();
+      if($("err").textContent==="กำลังโหลดข้อมูล…")$("err").textContent="";
+      const s=JSON.stringify({rows:r.rows,items:r.items});
+      if(s===lastSaved)return;          // ไม่มีอะไรเปลี่ยน ไม่ต้องวาดใหม่
+      rows=r.rows;ITEMS=r.items;saveLocal();drawItems();render();
+    })
+    .catch(e=>{if(!local)$("err").textContent="โหลดข้อมูลไม่สำเร็จ: "+e.message});
+}
+refresh();
 </script>
 </body>
 </html>
